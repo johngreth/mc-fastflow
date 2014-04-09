@@ -95,52 +95,13 @@ EXPORT DMatrix swps3_readDMatrix( char * filename ){
 }
 
 EXPORT SBMatrix swps3_readSBMatrix( char * filename ){
-	FILE * fp;
-	int i;
-	char line[ 1024 ];
-	char topChar[ 64 ];
-	int count=0;
 	memset( sbmatrix, 0, sizeof(sbmatrix) );
-	fp = fopen( filename, "r" );
-	if (!fp){
-		perror("Matrix - Error opening file:" );
-		exit( 1 );
-	}
-	/* parse the first line containing the caption ( "A R N ..." )*/
-	while ( !count && fgets( line, sizeof( line ), fp ) ){
-		char * pline = line;
-		while ( (pline = skip( pline )) ){
-			/* Skip the comment and empty lines */
-			if ( *pline=='#' || !*pline )
-				break;
-			if ( *pline<'A' || *pline>'Z'){
-				error("Matrix: Invalid matrix desciption (Character expected in the caption line)" );
-			}
-			topChar[ count++ ] = (char)*pline-'A';
-			pline++;
-		}
-	}
-	/* Parse the left charactes and values */
-	while ( fgets( line, sizeof( line ), fp ) ){
-		char * pline = skip( line );
-		/* Read the first character on a line */
-		char leftChar = (char)*pline-'A';
-		/* Skip the comment and empty lines */
-		if ( *pline=='#' || !*pline ) continue;
-		if ( *pline<'A' || *pline>'Z'){
-			error("Matrix: Invalid matrix desciption (Character expected at the beginning of the line)" );
-		}
-		/* Read in the values of the matrix */
-		for( i=0; i<count; i++ ){
-			pline = skip( pline+1 );
-			if (!isdigit( *pline ) && *pline!='-' && *pline!='.'){
-				error("Matrix: Excepted a matrix value got '%c'", *pline );
-			}
-			sbmatrix[ (int)leftChar ][ (int)topChar[ i ] ] = strtol( pline, &pline, 10 );
-		}
-	}
-	fclose( fp );
-	return (SBMatrix)sbmatrix;
+	for (int i = 0; i < 16; i++)
+        sbmatrix[i%4][i/4] = -1;
+    for (int i = 0; i < 4; i++)
+        sbmatrix[i][i] = 0;
+    
+    return (SBMatrix)sbmatrix;
 }
 
 EXPORT SBMatrix swps3_convertMatrixD2B( double factor ) {

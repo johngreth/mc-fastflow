@@ -50,6 +50,15 @@
 #include <string.h>
 #include <assert.h>
 #include <float.h>
+#include <iostream>
+#include <sys/time.h>
+#include <string.h>
+#define TEST_SIZE 1
+#define LOC_SIZE 1
+#include <string>
+#include <sys/times.h>
+
+#define BATCH_RUN 1000000
 
 static ssize_t write_all(int fd, const void *data, size_t len) {
 	size_t sent = 0;
@@ -110,7 +119,7 @@ int main( int argc, char * argv[] ){
 #endif
 #endif
         SBMatrix matrix;
-        FastaLib * queryLib;
+/*        FastaLib * queryLib;
 	for ( i=1; i<argc; i++ ){
 		if (argv[i][0]=='-'){
 			switch( argv[i][1] ){
@@ -153,302 +162,389 @@ int main( int argc, char * argv[] ){
 		printf( "Usage: %s [-h] [-s] [-j num] [-i num] [-e num] [-t num] matrix query db\n", argv[0] );
 		return 0;
 	}
-	matrix   = swps3_readSBMatrix( matrixFile );
-	queryLib = swps3_openLib( queryFile );
-	while ( (query=swps3_readNextSequence( queryLib, &queryLen )) ){
-		double score = 0;
-		int *pipes_read;
-		int *pipes_write;
-		char **seq_names;
-		pid_t *children;
-		int child_id = -1;
-		int childpipe_read = -1;
-		int childpipe_write = -1;
-		FastaLib * dbLib = swps3_openLib( dbFile );
-#if defined(__SSE2__)
-		ProfileByte  * profileByte = swps3_createProfileByteSSE( query, queryLen, matrix );
-		ProfileShort * profileShort = swps3_createProfileShortSSE( query, queryLen, matrix );
-#endif
-#if defined(__PS3)
-		SPEProfile * profileByte = swps3_createProfileBytePPU(query, queryLen, matrix, MAX_SEQ_LENGTH);
-		SPEProfile * profileShort = swps3_createProfileShortPPU(query, queryLen, matrix, MAX_SEQ_LENGTH);
-		SPEProfile * profileFloat = swps3_createProfileFloatPPU(query, queryLen, matrix, MAX_SEQ_LENGTH);
-		/* by default byte profile will be loaded */
-		int current_profile_is_byte = 0;
-		/* loadProfileByte(profileByte, MAX_SEQ_LENGTH, &options);*/
-#endif
-#if defined(__ALTIVEC__)
-		void *profileByteAltivec = swps3_createProfileByteAltivec(query, queryLen, matrix);
-		void *profileShortAltivec = swps3_createProfileShortAltivec(query, queryLen, matrix);
-		void *profileFloatAltivec = swps3_createProfileFloatAltivec(query, queryLen, matrix);
-#endif
-		pipes_read = malloc(threads*sizeof(*pipes_read));
-		pipes_write = malloc(threads*sizeof(*pipes_write));
-		children = malloc(threads*sizeof(*children));
-		seq_names = malloc(threads*sizeof(*seq_names));
-		for(i=0;i<threads;++i) {
-			pipes_read[i]=-1;
-			pipes_write[i]=-1;
-			children[i]=-1;
-			seq_names[i]=malloc((MAX_SEQ_NAME_LENGTH+1)*sizeof(char));
-			seq_names[i][MAX_SEQ_NAME_LENGTH]='\0';
+*/
+    options.gapOpen = 1;
+    options.gapExt = 1;
+    threads = 1;
+    options.threshold = atoi( argv[1]);
+
+    matrix   = swps3_readSBMatrix( matrixFile );
+	//queryLib = swps3_openLib( queryFile );
+
+    // START BENCHMARK CODE
+    string *read_strs = new string [BATCH_RUN];
+	string *ref_strs = new string [BATCH_RUN];
+
+	if (argc != 2) {
+		printf("$>bin error\n");
+		exit(1);
+	}
+
+	//FILE *input;
+	//FILE *output;
+
+	//input = fopen(argv[1], "r");
+	//output = fopen(argv[2], "w");
+
+	int error = 0 - atoi(argv[1]);
+
+	char* read = NULL;
+	char* ref = NULL;
+
+	long long align_num = 0;
+	long long total_num = 0;
+
+	size_t length;
+
+	long long read_size;
+	long long read_idx;
+
+	bool stop = false;
+
+	tms start_time;
+	tms end_time;
+	tms elp_time;
+
+	elp_time.tms_stime = 0;
+	elp_time.tms_utime = 0;
+	elp_time.tms_cstime = 0;
+	elp_time.tms_cutime = 0;
+
+	while (1) {  // (query=swps3_readNextSequence( queryLib, &queryLen )) ){
+		for (read_size = 0; read_size < BATCH_RUN; read_size++) {		
+			getline(&read, &length, stdin);
+			int readlen = strlen(read);
+			read[readlen - 1] = '\0';
+			if (strcmp(read, "end_of_file\0") == 0) {
+				stop = true;
+				break;
+			}
+			read_strs[read_size].assign(read);
+
+			getline(&ref, &length, stdin);
+			int reflen = strlen(ref);
+			ref[reflen - 1] = '\0';
+			ref_strs[read_size].assign(ref);
 		}
 
-		qCount++; qResidues+=queryLen;
-		dCount=dResidues=0;
+		times(&start_time);
 
-		if(threads>1) {
-			for(i=0; i<threads; ++i) {
-				int fds[2];
-				int res;
-				char *db;
-				int dbLen;
+		for (read_idx = 0; read_idx < read_size; read_idx++) {
+                // TODO: load query
+                query = read_strs[read_idx].c_str();
+                queryLen = read_strs[read_idx].length();
+			    bool pass = false;
+                double score = 0;
+                int *pipes_read;
+                int *pipes_write;
+                char **seq_names;
+                pid_t *children;
+                int child_id = -1;
+                int childpipe_read = -1;
+                int childpipe_write = -1;
+                FastaLib * dbLib = swps3_openLib( dbFile );
+        #if defined(__SSE2__)
+                ProfileByte  * profileByte = swps3_createProfileByteSSE( query, queryLen, matrix );
+                ProfileShort * profileShort = swps3_createProfileShortSSE( query, queryLen, matrix );
+        #endif
+        #if defined(__PS3)
+                SPEProfile * profileByte = swps3_createProfileBytePPU(query, queryLen, matrix, MAX_SEQ_LENGTH);
+                SPEProfile * profileShort = swps3_createProfileShortPPU(query, queryLen, matrix, MAX_SEQ_LENGTH);
+                SPEProfile * profileFloat = swps3_createProfileFloatPPU(query, queryLen, matrix, MAX_SEQ_LENGTH);
+                /* by default byte profile will be loaded */
+                int current_profile_is_byte = 0;
+                /* loadProfileByte(profileByte, MAX_SEQ_LENGTH, &options);*/
+        #endif
+        #if defined(__ALTIVEC__)
+                void *profileByteAltivec = swps3_createProfileByteAltivec(query, queryLen, matrix);
+                void *profileShortAltivec = swps3_createProfileShortAltivec(query, queryLen, matrix);
+                void *profileFloatAltivec = swps3_createProfileFloatAltivec(query, queryLen, matrix);
+        #endif
+                pipes_read = malloc(threads*sizeof(*pipes_read));
+                pipes_write = malloc(threads*sizeof(*pipes_write));
+                children = malloc(threads*sizeof(*children));
+                seq_names = malloc(threads*sizeof(*seq_names));
+                for(i=0;i<threads;++i) {
+                    pipes_read[i]=-1;
+                    pipes_write[i]=-1;
+                    children[i]=-1;
+                    seq_names[i]=malloc((MAX_SEQ_NAME_LENGTH+1)*sizeof(char));
+                    seq_names[i][MAX_SEQ_NAME_LENGTH]='\0';
+                }
 
-				db=swps3_readNextSequence( dbLib, &dbLen);
-				strncpy(seq_names[i],swps3_getSequenceName(dbLib),MAX_SEQ_NAME_LENGTH);
+                qCount++; qResidues+=queryLen;
+                dCount=dResidues=0;
 
-				if(db == NULL) break;
+                if(threads>1) {
+                    for(i=0; i<threads; ++i) {
+                        int fds[2];
+                        int res;
+                        char *db;
+                        int dbLen;
 
-				dResidues+=dbLen;
+                        //db=swps3_readNextSequence( dbLib, &dbLen);
+                        
+                        db = ref_strs[read_idx].c_str();
+                        dbLen = ref_strs[read_idx].length();
+                        strncpy(seq_names[i],itoa(read_idx),MAX_SEQ_NAME_LENGTH);
 
-				res = pipe(fds);
-				if(res < 0) {
-					perror("error during pipe()");
-					exit(1);
-				}
-				pipes_read[i] = fds[0];
-				childpipe_write = fds[1];
+                        if(db == NULL) break;
 
-				res = pipe(fds);
-				if(res < 0) {
-					perror("error during pipe()");
-					exit(1);
-				}
-				pipes_write[i] = fds[1];
-				childpipe_read = fds[0];
+                        dResidues+=dbLen;
 
-				children[i] = fork();
-				if(children[i] < 0) {
-					perror("error during fork()");
-					exit(1);
-				} else if(children[i] == 0) {
-					int j;
-					for(j=0; j<=i; ++j) {
-						close(pipes_read[j]);
-						close(pipes_write[j]);
-						pipes_read[j] = -1;
-						pipes_write[j] = -1;
-					}
-					child_id = i;
+                        res = pipe(fds);
+                        if(res < 0) {
+                            perror("error during pipe()");
+                            exit(1);
+                        }
+                        pipes_read[i] = fds[0];
+                        childpipe_write = fds[1];
 
-					break;
-				} else {
-					ssize_t sres;
+                        res = pipe(fds);
+                        if(res < 0) {
+                            perror("error during pipe()");
+                            exit(1);
+                        }
+                        pipes_write[i] = fds[1];
+                        childpipe_read = fds[0];
 
-					close(childpipe_read);
-					close(childpipe_write);
-					childpipe_read = -1;
-					childpipe_write = -1;
+                        children[i] = fork();
+                        if(children[i] < 0) {
+                            perror("error during fork()");
+                            exit(1);
+                        } else if(children[i] == 0) {
+                            int j;
+                            for(j=0; j<=i; ++j) {
+                                close(pipes_read[j]);
+                                close(pipes_write[j]);
+                                pipes_read[j] = -1;
+                                pipes_write[j] = -1;
+                            }
+                            child_id = i;
 
-					sres = write_all(pipes_write[i],&dbLen,sizeof(int));
-					if(sres != sizeof(int)) {
-						perror("error during write()");
-						exit(1);
-					}
-					sres = write_all(pipes_write[i],db,dbLen);
-					if(sres != dbLen) {
-						perror("error during write()");
-						exit(1);
-					}
-				}
-			}
-		} else {
-			childpipe_read = -1;
-			childpipe_write = -1;
-			child_id = 0;
-		}
+                            break;
+                        } else {
+                            ssize_t sres;
 
-		do {
-			int dbLen;
-			char * db;
-			char * dbName;
+                            close(childpipe_read);
+                            close(childpipe_write);
+                            childpipe_read = -1;
+                            childpipe_write = -1;
 
-			if(childpipe_read <= 0) {
-				db = swps3_readNextSequence( dbLib, &dbLen);
-				dbName = swps3_getSequenceName(dbLib);
-			} else {
-				static char buffer[MAX_SEQ_LENGTH] __ALIGNED__;
-				ssize_t res;
+                            sres = write_all(pipes_write[i],&dbLen,sizeof(int));
+                            if(sres != sizeof(int)) {
+                                perror("error during write()");
+                                exit(1);
+                            }
+                            sres = write_all(pipes_write[i],db,dbLen);
+                            if(sres != dbLen) {
+                                perror("error during write()");
+                                exit(1);
+                            }
+                        }
+                    }
+                } else {
+                    childpipe_read = -1;
+                    childpipe_write = -1;
+                    child_id = 0;
+                }
 
-				db = buffer;
+                do {
+                    int dbLen;
+                    char * db;
+                    char * dbName;
 
-				res = read_all(childpipe_read,&dbLen,sizeof(int));
-				if(res != sizeof(int)) {
-					if(res == 0) exit(0);
-					perror("error during read()");
-					exit(1);
-				}
-				res = read_all(childpipe_read,db,dbLen);
-				if(res != dbLen) {
-					perror("error during read()");
-					exit(1);
-				}
-				dbName = seq_names[child_id];
-			}
+                    if(childpipe_read <= 0) {
+                        db = ref_strs[read_idx].c_str();
+                        dbLen = ref_strs[read_idx].length();
+                        strncpy(dbName,itoa(read_idx),MAX_SEQ_NAME_LENGTH);
+                        //db = swps3_readNextSequence( dbLib, &dbLen);
+                        //dbName = swps3_getSequenceName(dbLib);
+                    } else {
+                        static char buffer[MAX_SEQ_LENGTH] __ALIGNED__;
+                        ssize_t res;
 
-			if(child_id == -1) {
-				fd_set readfds;
-				int max_fd = -1;
-				int i;
-				int res;
+                        db = buffer;
 
-				FD_ZERO(&readfds);
+                        res = read_all(childpipe_read,&dbLen,sizeof(int));
+                        if(res != sizeof(int)) {
+                            if(res == 0) exit(0);
+                            perror("error during read()");
+                            exit(1);
+                        }
+                        res = read_all(childpipe_read,db,dbLen);
+                        if(res != dbLen) {
+                            perror("error during read()");
+                            exit(1);
+                        }
+                        dbName = seq_names[child_id];
+                    }
 
-				for(i=0; i<threads; ++i) {
-					if(pipes_read[i] > 0) FD_SET(pipes_read[i],&readfds);
-					if(pipes_read[i]>max_fd) max_fd = pipes_read[i];
-				}
+                    if(child_id == -1) {
+                        fd_set readfds;
+                        int max_fd = -1;
+                        int i;
+                        int res;
 
-				/* all children exited */
-				if(max_fd == -1) break;
+                        FD_ZERO(&readfds);
 
-				res = select(max_fd+1, &readfds, NULL, NULL, NULL);
-				if(res <= 0) {
-					perror("error during select()");
-					exit(1);
-				}
-				for(i=0; i<threads; ++i) {
-					if(pipes_read[i] > 0 && FD_ISSET(pipes_read[i],&readfds)) {
-						static char tmpbuff[MAX_SEQ_NAME_LENGTH+1];
-						char *newName;
-						res = read_all(pipes_read[i],&score,sizeof(score));
-						if(res != sizeof(score)) {
-							perror("error during read()");
-							exit(1);
-						}
+                        for(i=0; i<threads; ++i) {
+                            if(pipes_read[i] > 0) FD_SET(pipes_read[i],&readfds);
+                            if(pipes_read[i]>max_fd) max_fd = pipes_read[i];
+                        }
 
-						newName = dbName;
-						strncpy(tmpbuff,seq_names[i],MAX_SEQ_NAME_LENGTH);
-						dbName = tmpbuff;
+                        /* all children exited */
+                        if(max_fd == -1) break;
 
-						if(db) {
-							strncpy(seq_names[i],newName,MAX_SEQ_NAME_LENGTH);
+                        res = select(max_fd+1, &readfds, NULL, NULL, NULL);
+                        if(res <= 0) {
+                            perror("error during select()");
+                            exit(1);
+                        }
+                        for(i=0; i<threads; ++i) {
+                            if(pipes_read[i] > 0 && FD_ISSET(pipes_read[i],&readfds)) {
+                                static char tmpbuff[MAX_SEQ_NAME_LENGTH+1];
+                                char *newName;
+                                res = read_all(pipes_read[i],&score,sizeof(score));
+                                if(res != sizeof(score)) {
+                                    perror("error during read()");
+                                    exit(1);
+                                }
 
-							res = write_all(pipes_write[i],&dbLen,sizeof(int));
-							if(res != sizeof(int)) {
-								perror("error during write()");
-								exit(1);
-							}
-							res = write_all(pipes_write[i],db,dbLen);
-							if(res != dbLen) {
-								perror("error during write()");
-								exit(1);
-							}
-						} else {
-							close(pipes_write[i]);
-							close(pipes_read[i]);
-							pipes_write[i] = -1;
-							pipes_read[i] = -1;
-							free(seq_names[i]);
-							seq_names[i] = NULL;
-							waitpid(children[i],NULL,0);
-							children[i] = -1;
-						}
-						break;
-					}
-				}
-			} else {
-				if(db == NULL) break;
+                                newName = dbName;
+                                strncpy(tmpbuff,seq_names[i],MAX_SEQ_NAME_LENGTH);
+                                dbName = tmpbuff;
 
-#ifdef DEBUG
-				for(i=0; i<queryLen; ++i) printf("\t%c",query[i]);
-				printf("\n");
-#endif
+                                if(db) {
+                                    strncpy(seq_names[i],newName,MAX_SEQ_NAME_LENGTH);
 
-#if defined(__SSE2__)
-				if(type == SSE2) {
-					if( (score = swps3_alignmentByteSSE( profileByte, db, dbLen, &options )) >= DBL_MAX ) {
-						score = swps3_alignmentShortSSE( profileShort, db, dbLen, &options );
-						assert(score >= 250 && "score too low");
-					}
-				}
-#endif
-#if defined(__PS3)
-				if(type == PS3) {
-#if defined(__ALTIVEC__)
-					if(child_id == 6) {
-#if 0
-						score = swps3_dynProgrFloatAltivec(db, dbLen, profileFloatAltivec, &options);
-#else
-						score = swps3_dynProgrByteAltivec(db, dbLen, profileByteAltivec, &options);
-						if(score >= DBL_MAX)
-							score = swps3_dynProgrShortAltivec(db, dbLen, profileShortAltivec, &options);
-#endif
-					} else {
-#endif /* __ALTIVEC__ */
-#if 0
-						loadProfileFloat(profileFloat, MAX_SEQ_LENGTH, &options);
-						score = alignmentProfileSPE( db, dbLen );
-#elif 1
-						if(!current_profile_is_byte) swps3_loadProfileByte(profileByte, MAX_SEQ_LENGTH, &options);
-						current_profile_is_byte = 1;
-						score = swps3_alignmentProfileSPE( db, dbLen );
-						if( score >= DBL_MAX ) {
-							if(current_profile_is_byte) swps3_loadProfileShort(profileShort, MAX_SEQ_LENGTH, &options);
-							current_profile_is_byte = 0;
-							score = swps3_alignmentProfileSPE( db, dbLen );
-						}
-#elif 1
-						if(!current_profile_is_byte) swps3_loadProfileShort(profileShort, MAX_SEQ_LENGTH, &options);
-						current_profile_is_byte = 1;
-						score = swps3_alignmentProfileSPE( db, dbLen );
-#else
-						score = swps3_alignmentByteSPE( matrix, query, queryLen, db, dbLen, &options );
-						if( score >= DBL_MAX ) {
-							score = swps3_alignmentShortSPE( matrix, query, queryLen, db, dbLen, &options );
-						}
-#endif
-#if defined(__ALTIVEC__)
-					}
-#endif /* __ALTIVEC__ */
-				}
-#endif /* __PS3 */
-#if defined(__ALTIVEC__)
-				if(type == ALTIVEC) {
-#if 0
-					score = swps3_dynProgrFloatAltivec(db, dbLen, profileFloatAltivec, &options);
-#else
-					score = swps3_dynProgrByteAltivec(db, dbLen, profileByteAltivec, &options);
-					if(score >= DBL_MAX)
-						score = swps3_dynProgrShortAltivec(db, dbLen, profileShortAltivec, &options);
-				}
-#endif
-#endif /* __ALTIVEC__ */
-				if(type == SCALAR) {
-					double dmatrix[MATRIX_DIM*MATRIX_DIM];
-					for(i=0;i<MATRIX_DIM*MATRIX_DIM;++i) dmatrix[i]=matrix[i];
-					score = swps3_alignScalar( dmatrix, query, queryLen, db, dbLen, &options);
-				}
-			}
+                                    res = write_all(pipes_write[i],&dbLen,sizeof(int));
+                                    if(res != sizeof(int)) {
+                                        perror("error during write()");
+                                        exit(1);
+                                    }
+                                    res = write_all(pipes_write[i],db,dbLen);
+                                    if(res != dbLen) {
+                                        perror("error during write()");
+                                        exit(1);
+                                    }
+                                } else {
+                                    close(pipes_write[i]);
+                                    close(pipes_read[i]);
+                                    pipes_write[i] = -1;
+                                    pipes_read[i] = -1;
+                                    free(seq_names[i]);
+                                    seq_names[i] = NULL;
+                                    waitpid(children[i],NULL,0);
+                                    children[i] = -1;
+                                }
+                                break;
+                            }
+                        }
+                    } else {
+                        if(db == NULL) break;
 
-			if(childpipe_write > 0) {
-				ssize_t res;
+        #ifdef DEBUG
+                        for(i=0; i<queryLen; ++i) printf("\t%c",query[i]);
+                        printf("\n");
+        #endif
 
-				res = write_all(childpipe_write,&score,sizeof(score));
-				if(res != sizeof(score)) {
-					perror("error during write()");
-					exit(1);
-				}
-			} else {
-				if(score >= options.threshold) {
-					printf(">threshold\t%s\n",dbName);
-				} else {
-					printf("%g\t%s\n",score,dbName);
-				}
-			}
+        #if defined(__SSE2__)
+                        if(type == SSE2) {
+                            if( (score = swps3_alignmentByteSSE( profileByte, db, dbLen, &options )) >= DBL_MAX ) {
+                                score = swps3_alignmentShortSSE( profileShort, db, dbLen, &options );
+                                assert(score >= 250 && "score too low");
+                            }
+                        }
+        #endif
+        #if defined(__PS3)
+                        if(type == PS3) {
+        #if defined(__ALTIVEC__)
+                            if(child_id == 6) {
+        #if 0
+                                score = swps3_dynProgrFloatAltivec(db, dbLen, profileFloatAltivec, &options);
+        #else
+                                score = swps3_dynProgrByteAltivec(db, dbLen, profileByteAltivec, &options);
+                                if(score >= DBL_MAX)
+                                    score = swps3_dynProgrShortAltivec(db, dbLen, profileShortAltivec, &options);
+        #endif
+                            } else {
+        #endif /* __ALTIVEC__ */
+        #if 0
+                                loadProfileFloat(profileFloat, MAX_SEQ_LENGTH, &options);
+                                score = alignmentProfileSPE( db, dbLen );
+        #elif 1
+                                if(!current_profile_is_byte) swps3_loadProfileByte(profileByte, MAX_SEQ_LENGTH, &options);
+                                current_profile_is_byte = 1;
+                                score = swps3_alignmentProfileSPE( db, dbLen );
+                                if( score >= DBL_MAX ) {
+                                    if(current_profile_is_byte) swps3_loadProfileShort(profileShort, MAX_SEQ_LENGTH, &options);
+                                    current_profile_is_byte = 0;
+                                    score = swps3_alignmentProfileSPE( db, dbLen );
+                                }
+        #elif 1
+                                if(!current_profile_is_byte) swps3_loadProfileShort(profileShort, MAX_SEQ_LENGTH, &options);
+                                current_profile_is_byte = 1;
+                                score = swps3_alignmentProfileSPE( db, dbLen );
+        #else
+                                score = swps3_alignmentByteSPE( matrix, query, queryLen, db, dbLen, &options );
+                                if( score >= DBL_MAX ) {
+                                    score = swps3_alignmentShortSPE( matrix, query, queryLen, db, dbLen, &options );
+                                }
+        #endif
+        #if defined(__ALTIVEC__)
+                            }
+        #endif /* __ALTIVEC__ */
+                        }
+        #endif /* __PS3 */
+        #if defined(__ALTIVEC__)
+                        if(type == ALTIVEC) {
+        #if 0
+                            score = swps3_dynProgrFloatAltivec(db, dbLen, profileFloatAltivec, &options);
+        #else
+                            score = swps3_dynProgrByteAltivec(db, dbLen, profileByteAltivec, &options);
+                            if(score >= DBL_MAX)
+                                score = swps3_dynProgrShortAltivec(db, dbLen, profileShortAltivec, &options);
+                        }
+        #endif
+        #endif /* __ALTIVEC__ */
+                        if(type == SCALAR) {
+                            double dmatrix[MATRIX_DIM*MATRIX_DIM];
+                            for(i=0;i<MATRIX_DIM*MATRIX_DIM;++i) dmatrix[i]=matrix[i];
+                            score = swps3_alignScalar( dmatrix, query, queryLen, db, dbLen, &options);
+                        }
+                    }
 
-			dCount++; dResidues+=dbLen;
-		} while(1);
+                    if(childpipe_write > 0) {
+                        ssize_t res;
+
+                        res = write_all(childpipe_write,&score,sizeof(score));
+                        if(res != sizeof(score)) {
+                            perror("error during write()");
+                            exit(1);
+                        }
+                    } else {
+                        if(score >= options.threshold) {
+                            //printf(">threshold\t%s\n",dbName);
+                        } else {
+                            //printf("%g\t%s\n",score,dbName);
+                                align_num++;
+                                fprintf(stderr, "%s\n", read_strs[read_idx].c_str() );
+                                fprintf(stderr, "%s\n", ref_strs[read_idx].c_str() );
+                        }
+                    }
+
+                    dCount++; dResidues+=dbLen;
+                    
+                    if (pass) {
+                        align_num++;
+                        fprintf(stderr, "%s\n", read_strs[read_idx].c_str() );
+                        fprintf(stderr, "%s\n", ref_strs[read_idx].c_str() );
+                    }
+            
+                    total_num++;
+		    }
+        }
 
 		free(pipes_read);
 		free(pipes_write);
@@ -468,6 +564,6 @@ int main( int argc, char * argv[] ){
 	}
 	fprintf(stderr,"%d[%d] x %d[%d]\n", qCount, qResidues, dCount, dResidues );
 
-	swps3_closeLib( queryLib );
+	//swps3_closeLib( queryLib );
 	return 0;
 }
