@@ -96,9 +96,10 @@ EXPORT DMatrix swps3_readDMatrix( char * filename ){
 
 EXPORT SBMatrix swps3_readSBMatrix( char * filename ){
 	memset( sbmatrix, 0, sizeof(sbmatrix) );
-	for (int i = 0; i < 16; i++)
+	int i;
+    for (i = 0; i < 16; i++)
         sbmatrix[i%4][i/4] = -1;
-    for (int i = 0; i < 4; i++)
+    for (i = 0; i < 4; i++)
         sbmatrix[i][i] = 0;
     
     return (SBMatrix)sbmatrix;

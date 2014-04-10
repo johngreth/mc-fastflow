@@ -50,12 +50,10 @@
 #include <string.h>
 #include <assert.h>
 #include <float.h>
-#include <iostream>
 #include <sys/time.h>
 #include <string.h>
 #define TEST_SIZE 1
 #define LOC_SIZE 1
-#include <string>
 #include <sys/times.h>
 
 #define BATCH_RUN 1000000
@@ -92,6 +90,18 @@ static ssize_t read_all(int fd, void *buf, size_t len) {
 		}
 	}
 	return recv;
+}
+char *readline(char *in) {
+    char *cptr;
+
+    if (cptr = fgets(in, MAX_LINE, stdin)) {
+        while(*cptr == ' ' || *cptr == '\t') {
+            cptr++;
+        }
+        return cptr;    
+    } else {
+        return 0;
+    }
 }
 
 int main( int argc, char * argv[] ){
@@ -169,23 +179,24 @@ int main( int argc, char * argv[] ){
     options.threshold = atoi( argv[1]);
 
     matrix   = swps3_readSBMatrix( matrixFile );
-	//queryLib = swps3_openLib( queryFile );
+	/* queryLib = swps3_openLib( queryFile );
 
-    // START BENCHMARK CODE
-    string *read_strs = new string [BATCH_RUN];
-	string *ref_strs = new string [BATCH_RUN];
+     START BENCHMARK CODE
+    */
+    char* *read_strs[BATCH_RUN];
+	char* *ref_strs[BATCH_RUN];
 
 	if (argc != 2) {
 		printf("$>bin error\n");
 		exit(1);
 	}
 
-	//FILE *input;
-	//FILE *output;
+	/* FILE *input;
+	 FILE *output;
 
-	//input = fopen(argv[1], "r");
-	//output = fopen(argv[2], "w");
-
+	 input = fopen(argv[1], "r");
+	 output = fopen(argv[2], "w");
+*/
 	int error = 0 - atoi(argv[1]);
 
 	char* read = NULL;
@@ -199,7 +210,6 @@ int main( int argc, char * argv[] ){
 	long long read_size;
 	long long read_idx;
 
-	bool stop = false;
 
 	tms start_time;
 	tms end_time;
@@ -210,7 +220,7 @@ int main( int argc, char * argv[] ){
 	elp_time.tms_cstime = 0;
 	elp_time.tms_cutime = 0;
 
-	while (1) {  // (query=swps3_readNextSequence( queryLib, &queryLen )) ){
+	while (1) {  
 		for (read_size = 0; read_size < BATCH_RUN; read_size++) {		
 			getline(&read, &length, stdin);
 			int readlen = strlen(read);
@@ -233,7 +243,6 @@ int main( int argc, char * argv[] ){
                 // TODO: load query
                 query = read_strs[read_idx].c_str();
                 queryLen = read_strs[read_idx].length();
-			    bool pass = false;
                 double score = 0;
                 int *pipes_read;
                 int *pipes_write;
