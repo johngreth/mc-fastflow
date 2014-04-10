@@ -50,49 +50,17 @@
 #include <string.h>
 #include <assert.h>
 #include <float.h>
-#include <sys/time.h>
+#include <time.h>
 #include <string.h>
 #define TEST_SIZE 1
 #define LOC_SIZE 1
 
 #define BATCH_RUN 1000000
 
-static ssize_t write_all(int fd, const void *data, size_t len) {
-    size_t sent = 0;
-    while(sent < len) {
-        ssize_t res;
-        res = write(fd,(const int8_t*)data+sent,len-sent);
-        switch(res) {
-            case 0:
-                return sent;
-            case -1:
-                return -1;
-            default:
-                sent += res;
-        }
-    }
-    return sent;
-}
-
-static ssize_t read_all(int fd, void *buf, size_t len) {
-    size_t recv = 0;
-    while(recv < len) {
-        ssize_t res;
-        res = read(fd,(int8_t*)buf+recv,len-recv);
-        switch(res) {
-            case 0:
-                return recv;
-            case -1:
-                return -1;
-            default:
-                recv += res;
-        }
-    }
-    return recv;
-}
-
 int main( int argc, char * argv[] ){
-    char * matrixFile = NULL, * queryFile = NULL, * dbFile = NULL;
+    printf("start\n");
+    fflush(stdout);
+    char * matrixFile = NULL;
     int i, queryLen;
     char * query;
 #if defined(__SSE2__)
@@ -164,51 +132,9 @@ int main( int argc, char * argv[] ){
     options.gapExt = 1;
     threads = 1;
     options.threshold = atoi( argv[1]);
-
+    printf("Pre matrix\n");
     matrix   = swps3_readSBMatrix( matrixFile );
-            int *pipes_read;
-            int *pipes_write;
-            char **seq_names;
-            pid_t *children;
-            int child_id = -1;
-            int childpipe_read = -1;
-            int childpipe_write = -1;
-            FastaLib * dbLib = swps3_openLib( dbFile );
-#if defined(__SSE2__)
-            ProfileByte  * profileByte = swps3_createProfileByteSSE( query, queryLen, matrix );
-            ProfileShort * profileShort = swps3_createProfileShortSSE( query, queryLen, matrix );
-#endif
-#if defined(__PS3)
-            SPEProfile * profileByte = swps3_createProfileBytePPU(query, queryLen, matrix, MAX_SEQ_LENGTH);
-            SPEProfile * profileShort = swps3_createProfileShortPPU(query, queryLen, matrix, MAX_SEQ_LENGTH);
-            SPEProfile * profileFloat = swps3_createProfileFloatPPU(query, queryLen, matrix, MAX_SEQ_LENGTH);
-            /* by default byte profile will be loaded */
-            int current_profile_is_byte = 0;
-            /* loadProfileByte(profileByte, MAX_SEQ_LENGTH, &options);*/
-#endif
-#if defined(__ALTIVEC__)
-            void *profileByteAltivec = swps3_createProfileByteAltivec(query, queryLen, matrix);
-            void *profileShortAltivec = swps3_createProfileShortAltivec(query, queryLen, matrix);
-            void *profileFloatAltivec = swps3_createProfileFloatAltivec(query, queryLen, matrix);
-#endif
-            pipes_read = malloc(threads*sizeof(*pipes_read));
-            pipes_write = malloc(threads*sizeof(*pipes_write));
-            children = malloc(threads*sizeof(*children));
-            seq_names = malloc(threads*sizeof(*seq_names));
-            for(i=0;i<threads;++i) {
-                pipes_read[i]=-1;
-                pipes_write[i]=-1;
-                children[i]=-1;
-                seq_names[i]=malloc((MAX_SEQ_NAME_LENGTH+1)*sizeof(char));
-                seq_names[i][MAX_SEQ_NAME_LENGTH]='\0';
-            }
-
-            qCount++; qResidues+=queryLen;
-            dCount=dResidues=0;
-
-            childpipe_read = -1;
-            childpipe_write = -1;
-            child_id = 0;
+    printf("Post matrix\n");
     /* queryLib = swps3_openLib( queryFile );
 
        START BENCHMARK CODE
@@ -235,30 +161,24 @@ int main( int argc, char * argv[] ){
     long long read_idx;
 
 
-    tms start_time;
-    tms end_time;
-    tms elp_time;
-
-    elp_time.tms_stime = 0;
-    elp_time.tms_utime = 0;
-    elp_time.tms_cstime = 0;
-    elp_time.tms_cutime = 0;
+    clock_t start;
+    long long unsigned total;
 
     int stop = 0;
-
+printf("loop\n");
     while (!stop) {  
         stop = 0;
         for (read_size = 0; read_size < BATCH_RUN; read_size++) {		
-            fgets(read_strs[read_size], 200, stdin)
-                if (strcmp(read_strs[read_size], "end_of_file\0") == 0) {
-                    stop = 1;
-                    break;
-                }
+            fgets(read_strs[read_size], 200, stdin);
+            if (strcmp(read_strs[read_size], "end_of_file\0") == 0) {
+                stop = 1;
+                break;
+            }
 
-            fgets(ref_strs[read_size], 200, stdin)
+            fgets(ref_strs[read_size], 200, stdin);
         }
 
-        times(&start_time);
+        start = clock();
 
         for (read_idx = 0; read_idx < read_size; read_idx++) {
             /* TODO: load query */
@@ -266,124 +186,71 @@ int main( int argc, char * argv[] ){
             queryLen = strlen(read_strs[read_idx]);
             double score = 0;
 
-                int dbLen;
-                char * db;
-                char * dbName;
 
-                db = ref_strs[read_idx];
-                dbLen = strlen(ref_strs[read_idx]);
-                strncpy(dbName,itoa(read_idx),MAX_SEQ_NAME_LENGTH);
-                if(db == NULL) break;
+    int *pipes_read;
+    int *pipes_write;
+    char **seq_names;
+    pid_t *children;
+    int child_id = -1;
+    int childpipe_read = -1;
+    int childpipe_write = -1;
+#if defined(__SSE2__)
+    ProfileByte  * profileByte = swps3_createProfileByteSSE( query, queryLen, matrix );
+    ProfileShort * profileShort = swps3_createProfileShortSSE( query, queryLen, matrix );
+#endif
+    pipes_read = malloc(threads*sizeof(*pipes_read));
+    pipes_write = malloc(threads*sizeof(*pipes_write));
+    children = malloc(threads*sizeof(*children));
+    seq_names = malloc(threads*sizeof(*seq_names));
+    for(i=0;i<threads;++i) {
+        pipes_read[i]=-1;
+        pipes_write[i]=-1;
+        children[i]=-1;
+        seq_names[i]=malloc((MAX_SEQ_NAME_LENGTH+1)*sizeof(char));
+        seq_names[i][MAX_SEQ_NAME_LENGTH]='\0';
+    }
+
+    qCount++; qResidues+=queryLen;
+    dCount=dResidues=0;
+
+    childpipe_read = -1;
+    childpipe_write = -1;
+    child_id = 0;
+            int dbLen;
+            char * db;
+            char dbName[30];
+
+            db = ref_strs[read_idx];
+            dbLen = strlen(ref_strs[read_idx]);
+            sprintf(dbName, "%d", (int)read_idx);
+            if(db == NULL) break;
 
 #ifdef DEBUG
-                for(i=0; i<queryLen; ++i) printf("\t%c",query[i]);
-                printf("\n");
+            for(i=0; i<queryLen; ++i) printf("\t%c",query[i]);
+            printf("\n");
 #endif
 
-#if defined(__SSE2__)
-                if(type == SSE2) {
-                    if( (score = swps3_alignmentByteSSE( profileByte, db, dbLen, &options )) >= DBL_MAX ) {
-                        score = swps3_alignmentShortSSE( profileShort, db, dbLen, &options );
-                        assert(score >= 250 && "score too low");
-                    }
-                }
-#endif
-#if defined(__PS3)
-                if(type == PS3) {
-#if defined(__ALTIVEC__)
-                    if(child_id == 6) {
-#if 0
-                        score = swps3_dynProgrFloatAltivec(db, dbLen, profileFloatAltivec, &options);
-#else
-                        score = swps3_dynProgrByteAltivec(db, dbLen, profileByteAltivec, &options);
-                        if(score >= DBL_MAX)
-                            score = swps3_dynProgrShortAltivec(db, dbLen, profileShortAltivec, &options);
-#endif
-                    } else {
-#endif /* __ALTIVEC__ */
-#if 0
-                        loadProfileFloat(profileFloat, MAX_SEQ_LENGTH, &options);
-                        score = alignmentProfileSPE( db, dbLen );
-#elif 1
-                        if(!current_profile_is_byte) swps3_loadProfileByte(profileByte, MAX_SEQ_LENGTH, &options);
-                        current_profile_is_byte = 1;
-                        score = swps3_alignmentProfileSPE( db, dbLen );
-                        if( score >= DBL_MAX ) {
-                            if(current_profile_is_byte) swps3_loadProfileShort(profileShort, MAX_SEQ_LENGTH, &options);
-                            current_profile_is_byte = 0;
-                            score = swps3_alignmentProfileSPE( db, dbLen );
-                        }
-#elif 1
-                        if(!current_profile_is_byte) swps3_loadProfileShort(profileShort, MAX_SEQ_LENGTH, &options);
-                        current_profile_is_byte = 1;
-                        score = swps3_alignmentProfileSPE( db, dbLen );
-#else
-                        score = swps3_alignmentByteSPE( matrix, query, queryLen, db, dbLen, &options );
-                        if( score >= DBL_MAX ) {
-                            score = swps3_alignmentShortSPE( matrix, query, queryLen, db, dbLen, &options );
-                        }
-#endif
-#if defined(__ALTIVEC__)
-                    }
-#endif /* __ALTIVEC__ */
-                }
-#endif /* __PS3 */
-#if defined(__ALTIVEC__)
-                if(type == ALTIVEC) {
-#if 0
-                    score = swps3_dynProgrFloatAltivec(db, dbLen, profileFloatAltivec, &options);
-#else
-                    score = swps3_dynProgrByteAltivec(db, dbLen, profileByteAltivec, &options);
-                    if(score >= DBL_MAX)
-                        score = swps3_dynProgrShortAltivec(db, dbLen, profileShortAltivec, &options);
-                }
-#endif
-#endif /* __ALTIVEC__ */
-                if(type == SCALAR) {
-                    double dmatrix[MATRIX_DIM*MATRIX_DIM];
-                    for(i=0;i<MATRIX_DIM*MATRIX_DIM;++i) dmatrix[i]=matrix[i];
-                    score = swps3_alignScalar( dmatrix, query, queryLen, db, dbLen, &options);
+            if(type == SSE2) {
+                if( (score = swps3_alignmentByteSSE( profileByte, db, dbLen, &options )) >= DBL_MAX ) {
+                    score = swps3_alignmentShortSSE( profileShort, db, dbLen, &options );
+                    assert(score >= 250 && "score too low");
                 }
             }
-
-            if(childpipe_write > 0) {
-                ssize_t res;
-
-                res = write_all(childpipe_write,&score,sizeof(score));
-                if(res != sizeof(score)) {
-                    perror("error during write()");
-                    exit(1);
-                }
-            } else {
-                if(score >= options.threshold) {
-                    /* printf(">threshold\t%s\n",dbName); */
-                } else {
-                    /* printf("%g\t%s\n",score,dbName); */
-                    align_num++;
-                    fprintf(stderr, "%s\n", read_strs[read_idx] );
-                    fprintf(stderr, "%s\n", ref_strs[read_idx] );
-                }
+            if(score < options.threshold) {
+                align_num++;
+                fprintf(stderr, "%s\n", read_strs[read_idx] );
+                fprintf(stderr, "%s\n", ref_strs[read_idx] );
             }
+
+            total += clock() - start;
 
             dCount++; dResidues+=dbLen;
 
             total_num++;
+        }
     }
+    fprintf(stderr,"%d[%d] x %d[%d]\n", qCount, qResidues, dCount, dResidues );
 
-
-#if defined(__SSE2__)
-    swps3_freeProfileByteSSE( profileByte );
-    swps3_freeProfileShortSSE( profileShort );
-#endif
-#if defined(__PS3)
-    swps3_freeProfilePPU( profileByte );
-    swps3_freeProfilePPU( profileShort );
-    swps3_freeProfilePPU( profileFloat );
-#endif
-    swps3_closeLib( dbLib );
+    return 0;
 }
-fprintf(stderr,"%d[%d] x %d[%d]\n", qCount, qResidues, dCount, dResidues );
 
-/* swps3_closeLib( queryLib ); */
-return 0;
-}
