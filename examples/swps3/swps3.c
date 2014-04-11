@@ -186,7 +186,7 @@ printf("loop\n");
             queryLen = strlen(read_strs[read_idx]);
             double score = 0;
 
-
+/*
     int *pipes_read;
     int *pipes_write;
     char **seq_names;
@@ -194,14 +194,18 @@ printf("loop\n");
     int child_id = -1;
     int childpipe_read = -1;
     int childpipe_write = -1;
+*/
+
 #if defined(__SSE2__)
     ProfileByte  * profileByte = swps3_createProfileByteSSE( query, queryLen, matrix );
     ProfileShort * profileShort = swps3_createProfileShortSSE( query, queryLen, matrix );
 #endif
+/*
     pipes_read = malloc(threads*sizeof(*pipes_read));
     pipes_write = malloc(threads*sizeof(*pipes_write));
     children = malloc(threads*sizeof(*children));
     seq_names = malloc(threads*sizeof(*seq_names));
+*/
     for(i=0;i<threads;++i) {
         pipes_read[i]=-1;
         pipes_write[i]=-1;
