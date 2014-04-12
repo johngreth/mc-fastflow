@@ -109,7 +109,7 @@ EXPORT double swps3_alignmentByteSSE( ProfileByte * query, const char * db, int 
 	__m128i vStoreOpt;				/* the new optimal score */
 	__m128i vRD;					/* the new row deletion score */
 	__m128i vCD = vMinimums;		/* the column deletion score */
-	__m128i zero = vMinimums;		/* the column deletion score */
+	__m128i zero = vMinimums; /* the column deletion score */
 	__m128i vTmp;
 #ifdef DEBUG
 	int ii,jj;

@@ -57,9 +57,10 @@ int main( int argc, char * argv[] ){
     Options options = {-12,-2,DBL_MAX};
     int qCount=0, dCount=0, qResidues=0, dResidues=0;
     SBMatrix matrix;
-    options.gapOpen = 1;
-    options.gapExt = 1;
-    options.threshold = atoi( argv[1]);
+    options.gapOpen = -1;
+    options.gapExt = -1;
+    options.threshold = 5;
+    int max_score = 0 - atoi( argv[1]);
     printf("Pre matrix\n");
     matrix   = swps3_readSBMatrix( NULL );
     printf("Post matrix\n");
@@ -101,7 +102,6 @@ int main( int argc, char * argv[] ){
             queryLen = strlen(read_strs[read_idx]);
             double score = 0;
             ProfileByte  * profileByte = swps3_createProfileByteSSE( query, queryLen, matrix );
-            ProfileShort * profileShort = swps3_createProfileShortSSE( query, queryLen, matrix );
             qCount++; qResidues+=queryLen;
             dCount=dResidues=0;
 
@@ -110,13 +110,10 @@ int main( int argc, char * argv[] ){
 
             db = ref_strs[read_idx];
             dbLen = strlen(ref_strs[read_idx]);
-            if(db == NULL) break;
 
-                if( (score = swps3_alignmentByteSSE( profileByte, db, dbLen, &options )) >= DBL_MAX ) {
-                    score = swps3_alignmentShortSSE( profileShort, db, dbLen, &options );
-                    /* assert(score >= 250 && "score too low"); */
-                }
-            if(score < options.threshold) {
+            score = swps3_alignmentByteSSE( profileByte, db, dbLen, &options); 
+            if(score >= max_score) {
+                fprintf(stderr, "%d\n", (int)score);
                 align_num++;
                 fprintf(stderr, "%s", read_strs[read_idx] );
                 fprintf(stderr, "%s", ref_strs[read_idx] );
