@@ -95,13 +95,13 @@ EXPORT DMatrix swps3_readDMatrix( char * filename ){
 }
 
 EXPORT SBMatrix swps3_readSBMatrix( char * filename ){
-	memset( sbmatrix, 0, sizeof(sbmatrix) );
-	int i, j;
+    memset( sbmatrix, 0, sizeof(sbmatrix) );
+    int i, j;
     for (i = 0; i < MATRIX_DIM; i++)
     for (j = 0; j < MATRIX_DIM; j++)
-        sbmatrix[i][j] = -1;
+        sbmatrix[i][j] = 0;
     for (i = 0; i < MATRIX_DIM; i++)
-        sbmatrix[i][i] = 0;
+        sbmatrix[i][i] = 1;
     
     return (SBMatrix)sbmatrix;
 }

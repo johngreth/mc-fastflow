@@ -47,23 +47,17 @@
 #define TEST_SIZE 1
 #define LOC_SIZE 1
 
-#define BATCH_RUN 10000
+#define BATCH_RUN 1
 
 int main( int argc, char * argv[] ){
-    printf("start\n");
-    fflush(stdout);
-    int queryLen;
-    char * query;
-    Options options = {-12,-2,DBL_MAX};
+    int queryLen, dbLen;
+    char query[200];
+    char db[200];
+    Options options = {-1, -1,DBL_MAX};
     int qCount=0, dCount=0, qResidues=0, dResidues=0;
     SBMatrix matrix;
-    options.gapOpen = -1;
-    options.gapExt = -1;
-    options.threshold = 5;
-    int max_score = 0 - atoi( argv[1]);
-    printf("Pre matrix\n");
+    int max_score = atoi( argv[1]);
     matrix   = swps3_readSBMatrix( NULL );
-    printf("Post matrix\n");
     char read_strs[BATCH_RUN][200];
     char ref_strs[BATCH_RUN][200];
 
@@ -82,7 +76,6 @@ int main( int argc, char * argv[] ){
     long long unsigned total;
 
     int stop = 0;
-    printf("loop\n");
     while (!stop) {  
         stop = 0;
         for (read_size = 0; read_size < BATCH_RUN; read_size++) {		
@@ -98,21 +91,19 @@ int main( int argc, char * argv[] ){
         start = clock();
 
         for (read_idx = 0; read_idx < read_size; read_idx++) {
-            query = read_strs[read_idx];
-            queryLen = strlen(read_strs[read_idx]);
+            queryLen = strlen(read_strs[read_idx]) - 1;
+            memcpy(query, read_strs[read_idx], queryLen);
+            swps3_translateSequence(query, queryLen, NULL);
             double score = 0;
             ProfileByte  * profileByte = swps3_createProfileByteSSE( query, queryLen, matrix );
             qCount++; qResidues+=queryLen;
             dCount=dResidues=0;
+            dbLen = strlen(ref_strs[read_idx]) - 1;
+            memcpy(db, ref_strs[read_idx], dbLen);;
+            swps3_translateSequence(db, dbLen, NULL);
 
-            int dbLen;
-            char * db;
-
-            db = ref_strs[read_idx];
-            dbLen = strlen(ref_strs[read_idx]);
-
-            score = swps3_alignmentByteSSE( profileByte, db, dbLen, &options); 
-            if(score >= max_score) {
+            score = queryLen - swps3_alignmentByteSSE( profileByte, db, dbLen, &options); 
+            if(score <= max_score) { 
                 fprintf(stderr, "%d\n", (int)score);
                 align_num++;
                 fprintf(stderr, "%s", read_strs[read_idx] );
