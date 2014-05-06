@@ -45,7 +45,7 @@
 #define TEST_SIZE 1
 #define LOC_SIZE 1
 
-#define BATCH_RUN 1
+#define BATCH_RUN 10000
 
 int main( int argc, char * argv[] ){
     int queryLen = 0;
@@ -53,17 +53,18 @@ int main( int argc, char * argv[] ){
     char query[200];
     char db[200];
     Options options = {-1, -1, DBL_MAX};
-    int qCount=0, dCount=0, qResidues=0, dResidues=0;
     SBMatrix matrix;
-    int max_error = atoi( argv[1]);
+    unsigned max_error = atoi( argv[1]);
 	
     matrix   = swps3_readSBMatrix( NULL );
 
     char** read_strs;
     char** ref_strs;
+	char* valid_buff;
 
 	read_strs = (char**) malloc(BATCH_RUN * sizeof(char*) );
 	ref_strs = (char**) malloc(BATCH_RUN * sizeof(char*) );
+	valid_buff = (char*) malloc(BATCH_RUN * sizeof(char) );
 	
 	int i;
 	for (i = 0; i < BATCH_RUN; i++) {
@@ -104,41 +105,44 @@ int main( int argc, char * argv[] ){
 			if (temp_length > queryLen) {
 				queryLen = temp_length;
 				dbLen = temp_length;
-				printf("%d\n", queryLen);
+				/* printf("%d\n", queryLen); */
 			}
-			read_strs[queryLen] = '\0';
 
             fgets(ref_strs[read_size], 200, stdin);
-			ref_strs[queryLen] = '\0';
+
+			valid_buff[read_size] = 0;
         }
 
         times(&start_time);
 
         for (read_idx = 0; read_idx < read_size; read_idx++) {
             memcpy(query, read_strs[read_idx], queryLen);
-            swps3_translateSequence(read_strs[read_idx], queryLen, NULL);
+            swps3_translateSequence(query, queryLen, NULL);
             unsigned score = 0;
-            ProfileByte  * profileByte = swps3_createProfileByteSSE( read_strs[read_idx], queryLen, matrix );
-            qCount++;
-			qResidues += queryLen;
-            dCount = dResidues = 0;
+            ProfileByte  * profileByte = swps3_createProfileByteSSE( query, queryLen, matrix );
             memcpy(db, ref_strs[read_idx], dbLen);
-            swps3_translateSequence(ref_strs[read_idx], dbLen, NULL);
+            swps3_translateSequence(db, dbLen, NULL);
 
-            score = queryLen - swps3_alignmentByteSSE( profileByte, ref_strs[read_idx], dbLen, &options); 
-            if(score <= max_error) { 
-                fprintf(stderr, "%d\n", (int)score);
+            score = queryLen - swps3_alignmentByteSSE( profileByte, db, dbLen, &options); 
+            
+			if(score <= max_error)
+				valid_buff[read_idx] = 1;
+			
+			swps3_freeProfileByteSSE( profileByte );
+		} 
+		
+		times(&end_time);
+
+        for (read_idx = 0; read_idx < read_size; read_idx++) {
+			if (valid_buff[read_idx]) { 
                 passNum++;
-                fprintf(stderr, "%s\n", read_strs[read_idx] );
-                fprintf(stderr, "%s\n", ref_strs[read_idx] );
+                fprintf(stderr, "%s", read_strs[read_idx]);
+                fprintf(stderr, "%s", ref_strs[read_idx]);
             }
-
-            dCount++; dResidues+=dbLen;
 
             totalNum++;
         }
 
-		times(&end_time);
 		elp_time.tms_stime += end_time.tms_stime - start_time.tms_stime;
 		elp_time.tms_utime += end_time.tms_utime - start_time.tms_utime;
 		
@@ -158,6 +162,7 @@ int main( int argc, char * argv[] ){
 	}
 	free(read_strs);
 	free(ref_strs);
+	free(valid_buff);
 
 
     return 0;
